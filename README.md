@@ -25,15 +25,14 @@ Claude how to use it well.
 ## Install
 
 ```
-/plugin marketplace add liquiddesign/liquid-monitor-back
+/plugin marketplace add liquiddesign/lqdeck-mcp
 /plugin install lqdeck@lqdeck
 ```
 
-(Or, from a local clone: `/plugin marketplace add /path/to/liquid-monitor-back`.)
-
-The repository is private — installing requires git credentials that can
-already read it (SSH key or an authenticated `gh`/git credential helper), the
-same as cloning it normally.
+The [liquiddesign/lqdeck-mcp](https://github.com/liquiddesign/lqdeck-mcp)
+repository is public — no credentials needed. (LQDeck developers can alternatively add the
+marketplace from a local clone of the main repo:
+`/plugin marketplace add /path/to/liquid-monitor-back`.)
 
 ## Authentication (OAuth, no manual tokens)
 

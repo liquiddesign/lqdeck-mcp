@@ -1,0 +1,14 @@
+{
+  "name": "lqdeck",
+  "description": "LQDeck's own Claude Code plugin: MCP server access to monitored projects, errors, crons, and AI triage tasks, plus skills for working with them.",
+  "owner": {
+    "name": "LiquidDesign"
+  },
+  "plugins": [
+    {
+      "name": "lqdeck",
+      "source": "./",
+      "description": "Connect Claude Code to LQDeck: browse monitored projects, application errors and cron runs, pick up AI-triage tasks left by the cloud orchestrator, query a project's own database/logs, and wire up a new app to LQDeck's monitoring connector."
+    }
+  ]
+}
