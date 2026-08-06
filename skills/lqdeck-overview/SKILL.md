@@ -51,16 +51,27 @@ guaranteed to still be accessible — always resolve project ids through
   skill for what to do next.
 - `list_source_types` — catalog of trigger/context source types a project can
   be configured with.
+- `describe_resource` — what can be written on a `project`, `triage_source` or
+  `cron`: fields, allowed values, current values. **Call this before any write
+  you are not certain of** — see `lqdeck-admin`.
 
-**Write**
+**Write / administer**
+- `update_project` — change a project's configuration, including the
+  orchestrator's default model, effort, agent harness and automerge.
+- `configure_source` / `delete_source` — a project's trigger or context sources.
+- `save_cron` / `delete_cron` — cron definitions.
 - `create_project` — provision a new monitored project (returns its API key
   once).
-- `configure_source` — create/edit a project's trigger or context source.
+- `delete_project` — requires `confirm_name` matching the project name exactly.
 - `send_followup` — reply into an open triage task's conversation. **This
   wakes the cloud agent up again** — see `lqdeck-handoff` for when this is
   (and isn't) the right move.
 - `get_connector_install_guide` — generates a ready-to-follow install prompt
   for wiring a new app to LQDeck. See `lqdeck-connect`.
+
+Configuration writes go through the same validation as the admin panel, so a
+setting a human could not save is not saveable here either — `lqdeck-admin` has
+the rules.
 
 **Prompt**
 - `integrate-lqdeck` — a guided end-to-end flow for connecting the current
@@ -68,6 +79,7 @@ guaranteed to still be accessible — always resolve project ids through
 
 ## Where to go next
 
+- Changing a project's / source's / cron's configuration → `lqdeck-admin`.
 - Picking up a cloud agent's work locally, or sending it a follow-up →
   `lqdeck-handoff`.
 - Investigating an error or cron failure using the project's own DB/logs →

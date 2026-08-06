@@ -8,10 +8,13 @@ Claude how to use it well.
 ## What's included
 
 - **MCP server** (`lqdeck`) — read tools for projects, errors, crons, triage
-  tasks; write tools to provision a project, configure sources, follow up on a
-  task, and generate connector install guides.
+  tasks; write tools to administer LQDeck without opening the admin UI (projects,
+  triage sources, crons), provision a project, follow up on a task, and generate
+  connector install guides.
 - **Skills** (auto-invoked by Claude based on context):
   - `lqdeck-overview` — what LQDeck is, the tool map, first-use OAuth notes.
+  - `lqdeck-admin` — changing configuration over MCP: the discovery contract,
+    patch semantics, what is deliberately not writable.
   - `lqdeck-handoff` — picking up a cloud agent's stopped work locally (or
     sending it a follow-up to resume).
   - `lqdeck-context` — investigating errors/crons with a project's own
@@ -72,9 +75,10 @@ this plugin at a staging/dev instance, edit the `url` field in
 - Baseline: an LQDeck user account with access to at least one organization.
   Read tools (`list_projects`, `list_errors`, `list_triage_tasks`, ...) work
   with plain organization membership.
-- Write tools (`create_project`, `configure_source`, `send_followup`,
-  `get_connector_install_guide`) require the corresponding Spatie permission
-  within the target organization, same as the admin UI.
+- Write tools (`update_project`, `configure_source`, `save_cron`, the `delete_*`
+  tools, `create_project`, `send_followup`, `get_connector_install_guide`)
+  require the corresponding Spatie permission within the target organization,
+  and run the same validation as the admin UI.
 - `query_project_db` and `read_project_logs` additionally require the
   `UseContextSources:Project` permission and a `database`/`connector_database`
   or `logs` context source configured on the target project.
