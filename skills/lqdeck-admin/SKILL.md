@@ -44,6 +44,13 @@ the UI and without risking a state the UI would never have produced.
 | `delete_cron` | remove a cron |
 | `create_project` | provision a new project; returns its API key **once** |
 | `delete_project` | requires `confirm_name` equal to the project's name |
+| `dispatch_task` | send a gate-parked (handed-off) task to the AI agent |
+
+The dispatch gate: trigger sources carry `dispatch_mode` — `handoff` (default)
+records discovered tasks and parks them for a person, `auto` restores the legacy
+self-starting agent. Flip it per source via `configure_source(config_id: …,
+dispatch_mode: "auto"|"handoff")`; a single parked task is started with
+`dispatch_task`.
 
 `update_project` returns a `changed` list of exactly which dot-keys moved. Use it
 to tell the user what happened — and to notice when a write you thought was a

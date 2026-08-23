@@ -64,4 +64,10 @@ conversation is still open (its agent session hasn't been archived) — check
 | Want to see what's waiting | `list_tasks_awaiting_human` |
 | Ready to finish a task's work yourself | `get_task_handoff` → checkout → edit → `push --force-with-lease` |
 | Want the cloud agent to keep going | `send_followup` (wakes it up) |
+| Task is gate-parked (state `handoff`, never ran) and the agent should take it | `dispatch_task` (same as the admin "Send to agent" button) |
 | Just want to read the current state | `get_triage_task` |
+
+Note the dispatch gate: trigger sources default to `dispatch_mode: handoff`, so a
+freshly discovered task has **no run and no branch yet** — it waits for a person.
+`dispatch_task` starts the autonomous run; `get_task_handoff` on such a task returns
+a fresh-start brief (create the branch from base) instead of a take-over.
