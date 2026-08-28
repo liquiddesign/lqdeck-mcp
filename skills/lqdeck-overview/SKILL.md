@@ -42,6 +42,9 @@ guaranteed to still be accessible — always resolve project ids through
 - `get_project` — one project's crons, source configs, open task count.
 - `list_errors` / `get_error` — application errors, filterable by project,
   level, resolved state, date, message substring.
+- `list_uptime` — live website uptime monitors (last check, consecutive
+  failures, open outage). Optional `project_id`. A confirmed outage is an
+  open downtime row, not a single failed check.
 - `list_crons` / `get_cron_runs` — scheduled jobs and their run history.
 - `list_triage_tasks` / `get_triage_task` — AI triage tasks and their detail
   (conversation thread, Finish-flow stage, linked PR).
