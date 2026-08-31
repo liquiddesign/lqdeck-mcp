@@ -9,6 +9,7 @@ LQDeck is a monitoring backend that tracks, for a portfolio of applications:
 
 - **Crons** — scheduled jobs, their recent runs, and failure history.
 - **Errors** — application errors reported by the monitored app's error logger.
+  Each stored occurrence is open until someone resolves it (`resolve_errors`).
 - **Uptime** — website availability checks.
 - **Triage tasks** — tickets (from Freelo, Asana, e-mail, or the monitor's own
   error/cron alerts) that are worked autonomously by a cloud-hosted AI agent
@@ -55,20 +56,34 @@ guaranteed to still be accessible — always resolve project ids through
 - `list_source_types` — catalog of trigger/context source types a project can
   be configured with.
 - `describe_resource` — what can be written on a `project`, `triage_source` or
-  `cron`: fields, allowed values, current values. **Call this before any write
-  you are not certain of** — see `lqdeck-admin`.
+  `cron`: fields, allowed values, current values, and `steps` — the admin
+  wizard's own grouping and order, for walking a person through a setup one
+  step at a time. **Call this before any write you are not certain of** — see
+  `lqdeck-admin`.
+- `test_source_connection` — probe a `database` / `connector_database` / `logs`
+  source's credentials before saving them, like the admin's "Test connection".
+- `lookup_asana_gids` — turn Asana names into the gids an Asana trigger's filter
+  is built from.
 
 **Write / administer**
 - `update_project` — change a project's configuration, including the
   orchestrator's default model, effort, agent harness and automerge.
 - `configure_source` / `delete_source` — a project's trigger or context sources.
 - `save_cron` / `delete_cron` — cron definitions.
-- `create_project` — provision a new monitored project (returns its API key
-  once).
+- `create_project` — provision a new monitored project, accepting everything the
+  admin's create wizard does: uptime URLs, outage alert contacts, Slack error
+  reporting, the orchestrator configuration (returns its API key once).
 - `delete_project` — requires `confirm_name` matching the project name exactly.
 - `send_followup` — reply into an open triage task's conversation. **This
   wakes the cloud agent up again** — see `lqdeck-handoff` for when this is
   (and isn't) the right move.
+- `resolve_errors` — mark application errors as resolved once they are dealt
+  with, or reopen them with `resolved: false`. Per stored occurrence, not per
+  error class; needs `Update:Error`. See `lqdeck-context`.
+- `archive_task` — archive a triage task that has been dealt with, so it stops
+  showing up in `list_tasks_awaiting_human`.
+- `dispatch_task` — send a handed-off task to the AI agent (the dispatch gate;
+  starts an autonomous run). See `lqdeck-handoff`.
 - `get_connector_install_guide` — generates a ready-to-follow install prompt
   for wiring a new app to LQDeck. See `lqdeck-connect`.
 
@@ -82,9 +97,11 @@ the rules.
 
 ## Where to go next
 
+- Creating a project, an AI trigger source or an AI context source — including
+  walking a person through it interactively → `lqdeck-admin`.
 - Changing a project's / source's / cron's configuration → `lqdeck-admin`.
 - Picking up a cloud agent's work locally, or sending it a follow-up →
   `lqdeck-handoff`.
-- Investigating an error or cron failure using the project's own DB/logs →
-  `lqdeck-context`.
+- Investigating an error or cron failure using the project's own DB/logs, and
+  closing errors off once handled → `lqdeck-context`.
 - Wiring a new or existing app up to LQDeck monitoring → `lqdeck-connect`.

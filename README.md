@@ -9,8 +9,8 @@ Claude how to use it well.
 
 - **MCP server** (`lqdeck`) — read tools for projects, errors, crons, triage
   tasks; write tools to administer LQDeck without opening the admin UI (projects,
-  triage sources, crons), provision a project, follow up on a task, and generate
-  connector install guides.
+  triage sources, crons), provision a project, mark errors resolved, follow up on
+  a task, and generate connector install guides.
 - **Skills** (auto-invoked by Claude based on context):
   - `lqdeck-overview` — what LQDeck is, the tool map, first-use OAuth notes.
   - `lqdeck-admin` — changing configuration over MCP: the discovery contract,
@@ -18,7 +18,7 @@ Claude how to use it well.
   - `lqdeck-handoff` — picking up a cloud agent's stopped work locally (or
     sending it a follow-up to resume).
   - `lqdeck-context` — investigating errors/crons with a project's own
-    database and logs.
+    database and logs, and marking errors resolved once handled.
   - `lqdeck-connect` — wiring a new or existing app up to LQDeck monitoring.
 - **Command** — `/lqdeck-pickup`: find your waiting triage tasks and prepare a
   local checkout of one.
@@ -79,6 +79,9 @@ this plugin at a staging/dev instance, edit the `url` field in
   tools, `create_project`, `send_followup`, `get_connector_install_guide`)
   require the corresponding Spatie permission within the target organization,
   and run the same validation as the admin UI.
+- `resolve_errors` requires `Update:Error` in the organization the errors belong
+  to — the client-facing `monitor` role does not hold it, exactly as it does not
+  see the admin panel's Resolve button.
 - `query_project_db` and `read_project_logs` additionally require the
   `UseContextSources:Project` permission and a `database`/`connector_database`
   or `logs` context source configured on the target project.

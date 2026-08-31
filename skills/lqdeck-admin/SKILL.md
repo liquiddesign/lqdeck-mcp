@@ -1,6 +1,6 @@
 ---
 name: lqdeck-admin
-description: How to change LQDeck configuration through the MCP server instead of the admin UI — projects (name, uptime URLs, error/Slack reporting, orchestrator model/effort/agent/automerge/limits), triage sources (Freelo, Asana, e-mail, monitor errors, context sources), and crons. Use this whenever the user asks to change, enable, disable, rename, retune or delete something in LQDeck ("switch project ABC to Opus 5", "turn off automerge", "only take Freelo tasks created after 1 August", "add a cron", "delete this source"). Read it before the first write in a session.
+description: How to create and change LQDeck configuration through the MCP server instead of the admin UI — provisioning projects, setting up AI trigger sources and AI context sources, and crons — including how to walk a person through it interactively, one wizard step at a time, exactly as the admin panel would. Use this whenever the user asks to create, add, change, enable, disable, rename, retune or delete something in LQDeck ("set up a new project", "založ projekt", "add an Asana source", "connect a database as context", "switch project ABC to Opus 5", "turn off automerge", "add a cron", "delete this source"). Read it before the first write in a session.
 ---
 
 # Administering LQDeck over MCP
@@ -33,6 +33,52 @@ the UI and without risking a state the UI would never have produced.
    field is genuinely off limits for that row (see *Narrowing* below) — do not
    retry it under a different name.
 
+## Setting something up *with* a person: walk the wizard
+
+When the user wants to create something rather than tweak one value ("set up a new
+project", "add an Asana source"), do **not** ask them for forty keys, and do not
+invent a shape of your own. `describe_resource` returns `steps` — the admin
+wizard's own grouping, in the admin's own order. Walk it:
+
+1. `describe_resource(resource: "project")` — or, for a source that does not exist
+   yet, `describe_resource(resource: "triage_source", project_id: …, kind: …,
+   source_type: …)`, which additionally returns that source type's `config_fields`,
+   their defaults and their help text.
+2. Ask for one step's fields at a time, using each field's `label` and
+   `description` — they are the same words the admin panel shows.
+3. Skip anything whose `relevant_when` is not satisfied by the answers so far. If
+   the user does not want the orchestrator, do not ask for a repository URL; if
+   Slack error reporting is off, do not ask for a webhook.
+4. Respect `required_when`: a field can be required only in one branch (a browser
+   key once browser errors are collected).
+5. For a database, log or Asana source, run the matching probe **before** writing,
+   and report what it said.
+6. Write once, at the end, with everything gathered — `create_project` and
+   `configure_source` each take the whole payload in one call. A field you never
+   asked about simply keeps the default the empty admin form would have submitted.
+
+Steps you cannot fill over MCP, and must hand back to the user: **git credentials**
+(deploy key / PAT) and **key rotation**. Say so plainly and point at
+`/app/projects/{id}/edit` — the orchestrator will not clone until a human has put
+the credentials in.
+
+## Creating an AI source vs. an AI context source
+
+Both are `configure_source`; the difference is `kind`, and it decides the whole
+field set:
+
+- `kind: "trigger"` — **opens** triage tasks (Freelo, Asana, e-mail, monitor
+  errors, website downtime, cron failures, security review). Takes the scan
+  interval, the hourly cap, and the per-task agent overrides.
+- `kind: "context"` — **is read by** the agent while it works a task (errors, job
+  runs, logs, a database, connector database, triage history). Takes no agent
+  overrides at all, because it has no session of its own.
+
+`list_source_types` is the catalog of what exists; `describe_resource` with
+`project_id` + `kind` + `source_type` is what that one type needs. Both `kind` and
+`source_type` are write-once, so get them right before the first write — and pass
+them on the create call, never on an edit.
+
 ## The write tools
 
 | Tool | What it writes |
@@ -42,15 +88,17 @@ the UI and without risking a state the UI would never have produced.
 | `delete_source` | remove a source |
 | `save_cron` | create or edit a cron (`cron_id` to edit) |
 | `delete_cron` | remove a cron |
-| `create_project` | provision a new project; returns its API key **once** |
+| `create_project` | provision a new project — the whole create wizard, not just a name; returns its API key **once** |
 | `delete_project` | requires `confirm_name` equal to the project's name |
-| `dispatch_task` | send a gate-parked (handed-off) task to the AI agent |
 
-The dispatch gate: trigger sources carry `dispatch_mode` — `handoff` (default)
-records discovered tasks and parks them for a person, `auto` restores the legacy
-self-starting agent. Flip it per source via `configure_source(config_id: …,
-dispatch_mode: "auto"|"handoff")`; a single parked task is started with
-`dispatch_task`.
+Two read-only tools cover the wizard's "try it first" buttons, and you should use
+them for the same reason the admin panel has them — so a person is not asked to
+trust credentials nobody checked:
+
+| Tool | What it answers |
+|---|---|
+| `test_source_connection` | does this `database` / `connector_database` / `logs` config actually connect? |
+| `lookup_asana_gids` | what are the gids behind these Asana names? (workspaces → projects → sections → custom fields → their options) |
 
 `update_project` returns a `changed` list of exactly which dot-keys moved. Use it
 to tell the user what happened — and to notice when a write you thought was a
@@ -131,6 +179,29 @@ config_id: …, trigger_min_created_at: "2026-08-01T00:00:00+02:00")`. Check
 `supports_created_at_cutoff` in `list_source_types` first: the cutoff only means
 something for source types that report it. Do **not** send `config` — the stored
 Freelo token stays put.
+
+**"Set up a new project for shop.example.com."** (interactive)
+`describe_resource(resource: "project")` → walk `steps`: name; uptime URL; who gets
+outage alerts; Slack error reporting (skip the webhook if they say no); orchestrator
+(skip the whole step if they say no) → one `create_project(...)` call with everything
+→ hand them the `api_key` **once**, tell them where it goes (the connector config),
+and mention that git credentials, if they enabled the orchestrator, still need the
+admin panel. Follow with the `lqdeck-connect` skill to actually wire the app up.
+
+**"Add our production database as context for the AI."**
+`list_source_types` → `describe_resource(resource: "triage_source", project_id: …,
+kind: "context", source_type: "database")` for the exact `config_fields` → collect
+host/port/database/user/password → `test_source_connection(project_id: …,
+source_type: "database", config: {…})` and report the result → only then
+`configure_source(project_id: …, kind: "context", source_type: "database",
+config: {…})`. Never write credentials you have not probed.
+
+**"Take tasks from our Asana board."**
+`describe_resource(... kind: "trigger", source_type: "asana")` → ask for the PAT →
+`lookup_asana_gids(lookup: "workspaces", config: {asana_pat: …})` → let the user
+pick → `lookup_asana_gids(lookup: "projects", config: {asana_pat: …, workspace_gid: …})`
+→ and so on down to sections / custom fields as the filter needs. Never invent a gid.
+When editing later, pass `config_id` and omit `asana_pat` — the stored token is used.
 
 **"Delete the old staging project."**
 Ask the user for the exact name and pass it as `confirm_name`. Do not read the
