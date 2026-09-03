@@ -11,11 +11,29 @@ reporting on any site. `get_connector_install_guide` generates a complete,
 ready-to-follow prompt with the project's real API key and endpoint URLs
 already filled in — never hand-write the connector configuration yourself.
 
-For the full guided version of this flow, the `integrate-lqdeck` MCP prompt
-walks through the same steps end to end and can be invoked directly instead of
-following this skill manually.
+## The main path: `/lqdeck:setup`
 
-## Steps
+For a full setup, run the `/lqdeck:setup` command (or invoke the `setup-project`
+MCP prompt directly) inside the repository being connected. It chains together
+everything this integration needs, not just the connector: verifying MCP
+access, discovering the framework/git remote/connector endpoints from the repo
+itself, finding or creating the matching LQDeck project, following the connector
+install guide, configuring uptime monitoring and triage sources, gathering
+secrets (Slack webhook, git credentials, alert contacts, Freelo/Asana) right in
+the conversation, and finishing with a `test_project_integration` PASS/FAIL
+report. It is idempotent — safe to re-run against a project that already
+exists to fill in whatever is still missing, including pointing it at a known
+project with `project_id` to skip project creation entirely.
+
+Prefer this over the manual steps below whenever the user wants the app
+properly wired up, not just the connector package installed.
+
+## Doing it by hand (fallback)
+
+Use this when only the connector itself is wanted — e.g. the project already
+exists and is fully configured, and this is just another repository being
+connected to it, or the user explicitly wants to walk through each step
+themselves.
 
 1. **Detect the framework** of the current repository:
    - `composer.json` requiring `nette/application` (or other `nette/*`
@@ -31,8 +49,9 @@ following this skill manually.
    user which project this repository corresponds to. If none match, ask
    whether to create one and call `create_project` with a sensible name (e.g.
    the repository name). `create_project` returns the plaintext API key —
-   this is the only time it is exposed outside the admin UI, so use it
-   immediately in the install guide and don't try to fetch it again later.
+   this is the only time it is exposed outside the admin UI (besides
+   `rotate_project_api_key`), so use it immediately in the install guide and
+   don't try to fetch it again later.
 
 3. **Get the install guide.** Call `get_connector_install_guide` with the
    `project_id` and the detected `framework`. For `"nette"`/`"laravel"`, ask
@@ -46,12 +65,15 @@ following this skill manually.
    configuration it describes, and make the code changes it calls for
    (registering crons, wiring the error logger/reporter, adding the script tag
    or calling `init()`). Don't invent a different configuration shape — the
-   prompt already reflects this specific project's real values.
+   prompt already reflects this specific project's real values. Leave the
+   changes uncommitted and tell the user what changed.
 
 5. **Verify it actually works** before finishing:
    - `"nette"`/`"laravel"`: trigger a real cron run (or a test error if
      `errors_only`) and confirm in the LQDeck admin panel (the `admin_url`
-     from the tool response) that it was recorded.
+     from the tool response) that it was recorded — or call
+     `test_project_integration` for the same check plus everything else
+     already configured on the project.
    - `"js"`: trigger a test error in the browser (e.g.
      `throw new Error('lqdeck test')`) and confirm it appears in the admin
      panel's error list for the project.

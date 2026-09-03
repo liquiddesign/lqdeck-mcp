@@ -1,6 +1,6 @@
 ---
 name: lqdeck-admin
-description: How to create and change LQDeck configuration through the MCP server instead of the admin UI — provisioning projects, setting up AI trigger sources and AI context sources, and crons — including how to walk a person through it interactively, one wizard step at a time, exactly as the admin panel would. Use this whenever the user asks to create, add, change, enable, disable, rename, retune or delete something in LQDeck ("set up a new project", "založ projekt", "add an Asana source", "connect a database as context", "switch project ABC to Opus 5", "turn off automerge", "add a cron", "delete this source"). Read it before the first write in a session.
+description: How to create and change LQDeck configuration through the MCP server instead of the admin UI — provisioning projects, setting up AI trigger sources and AI context sources, and crons — including how to walk a person through it interactively, one wizard step at a time, exactly as the admin panel would. Use this whenever the user asks to create, add, change, enable, disable, rename, retune or delete something in LQDeck ("set up a new project", "založ projekt", "add an Asana source", "connect a database as context", "switch project ABC to Opus 5", "add a cron", "delete this source"). Read it before the first write in a session.
 ---
 
 # Administering LQDeck over MCP
@@ -57,10 +57,11 @@ wizard's own grouping, in the admin's own order. Walk it:
    `configure_source` each take the whole payload in one call. A field you never
    asked about simply keeps the default the empty admin form would have submitted.
 
-Steps you cannot fill over MCP, and must hand back to the user: **git credentials**
-(deploy key / PAT) and **key rotation**. Say so plainly and point at
-`/app/projects/{id}/edit` — the orchestrator will not clone until a human has put
-the credentials in.
+Nothing here is admin-panel-only anymore. Git credentials (`auth_method`
+"deploy_key"/"pat" plus `git_username` and `orchestrator_git_credentials` on
+`update_project`, verified with `test_git_credentials` or `list_git_branches`)
+and key rotation (`rotate_project_api_key`) both go through MCP, gated by
+`UpdateSensitive:Project` — see *Beyond project/source/cron* below.
 
 ## Creating an AI source vs. an AI context source
 
@@ -90,14 +91,21 @@ them on the create call, never on an edit.
 | `delete_cron` | remove a cron |
 | `create_project` | provision a new project — the whole create wizard, not just a name; returns its API key **once** |
 | `delete_project` | requires `confirm_name` equal to the project's name |
+| `rotate_project_api_key` | mint a fresh connector (`key: "connector"`) or browser (`key: "browser"`) API key and invalidate the old one immediately; the only MCP tool that ever returns a secret, and only this once |
 
-Two read-only tools cover the wizard's "try it first" buttons, and you should use
+Read-only tools cover the wizard's "try it first" buttons, and you should use
 them for the same reason the admin panel has them — so a person is not asked to
 trust credentials nobody checked:
 
 | Tool | What it answers |
 |---|---|
-| `test_source_connection` | does this `database` / `connector_database` / `logs` config actually connect? |
+| `test_source_connection` | does this source's `config` (Freelo, Asana, IMAP/SMTP, database, connector database, logs) actually connect? |
+| `test_git_credentials` | can the orchestrator reach the project's git remote with its effective credentials (`git ls-remote`, never a clone)? |
+| `list_git_branches` | same check, plus the branch list and which one is the remote default — useful before saving `orchestrator_default_branch` |
+| `test_slack_webhook` | send a real test message through a Slack incoming webhook (pass `webhook_url` to try one not saved yet) |
+| `test_uptime_url` | one synchronous HTTP GET against a candidate or saved uptime URL |
+| `test_project_integration` | the full setup checklist in one call — connector seen, every uptime URL, Slack, git access, every configured source — PASS/FAIL/SKIP per item; the last step of any setup |
+| `sync_repo` | queue a clone (first time) or fetch (afterwards) of the orchestrator's repo; check completion via `get_project`'s `last_sync` |
 | `lookup_asana_gids` | what are the gids behind these Asana names? (workspaces → projects → sections → custom fields → their options) |
 
 `update_project` returns a `changed` list of exactly which dot-keys moved. Use it
@@ -111,15 +119,9 @@ update_project(project_id: 12, orchestrator_settings: {claude_model: "claude-opu
 ```
 
 changes that one key. Its ~30 siblings (effort, agent harness, session limits,
-timeouts, automerge, watch window) keep their stored values. Sending an
+timeouts, watch window) keep their stored values. Sending an
 unrecognised key inside the object is an error rather than a silent write into the
 JSON column, so a typo surfaces immediately.
-
-Two settings that are easy to confuse:
-
-- `auto_merge_when_safe` — whether a pull request may be merged without a human.
-- `auto_merge_max_risk` (`low` | `medium` | `high`) — the highest merge-safety
-  rating still merged automatically. Turning automerge off does not change it.
 
 ## Narrowing: what a row accepts depends on its state
 
@@ -130,23 +132,79 @@ narrowing for the id you pass:
   code, i.e. pull execution mode) accepts only `active` and `groups`. Its name,
   URL and schedule belong to that repository.
 - A **context source** has no agent session, so it accepts none of the per-task
-  overrides (model, effort, harness, verification, watch window, hourly cap).
+  overrides (model, effort, harness, watch window, hourly cap).
   Only a **trigger** source does.
 - A source's `kind` and `source_type` are **write-once** — changing either would
   reinterpret the whole stored `config` payload. Delete and recreate instead.
 
 ## Secrets
 
-API keys, git credentials and agent tokens are **never returned** and **cannot be
-written** over MCP; discovery reports only whether one is stored
-(`secrets_set` / `current_set`). Rotating a key is an admin-panel action — tell
-the user that rather than attempting it.
+Every secret is **write-only** over MCP: `orchestrator_git_credentials`, alert
+contacts, the Slack webhook, and a source's `config` payload (a Freelo token, a
+database password) can all be set — gated by `UpdateSensitive:Project` for the
+project-level ones — but never read back. Discovery reports only whether one is
+stored (`secrets_set` / `*_set` / `config_set`). **Omit a secret field when
+editing** and the stored value is kept — you never need to ask the user to
+re-type a token just to change a polling interval or a branch name.
 
-The one exception is a source's `config` payload, which is how credentials get
-into a source (a Freelo token, a database password). It is write-only: you can set
-it, you can never read it back. **Omit it when editing** and the stored
-configuration is kept — so you never need to ask the user to re-type a token just
-to change a polling interval.
+The one value you cannot set directly is the connector/browser API key itself —
+`rotate_project_api_key` mints a new one and hands it back exactly once, since
+rotation is the only way to hand one over at all. `claude_oauth_token` and
+`cursor_api_key` stay `.env`-only; no MCP tool touches them.
+
+## Beyond project/source/cron
+
+The same four rules apply everywhere else in LQDeck; these resources just have
+their own tools instead of `update_project`/`configure_source`/`save_cron`.
+
+**Cron groups** — a label a project's crons can be tagged with, to pause or
+report on them as a set:
+
+| Tool | |
+|---|---|
+| `list_cron_groups` | the group uuids for a project |
+| `save_cron_group` | create (`project_id`) or edit (`cron_group_id`) |
+| `delete_cron_group` | remove one |
+
+**Error rules** — ignore rules drop or hide matching errors; threshold rules
+fire a Slack notification and/or open an AI task once a group of errors
+crosses a count within a time window. Both can span several projects in the
+same organization:
+
+| Tool | |
+|---|---|
+| `list_error_ignore_rules` / `save_error_ignore_rule` / `delete_error_ignore_rule` | drop-on-ingest or hide-from-AI rules |
+| `list_error_thresholds` / `save_error_threshold` / `delete_error_threshold` | count-within-a-window alerting rules |
+
+**Website downtimes** — `save_downtime` corrects or backfills a manual record;
+`delete_downtime` removes one; `acknowledge_downtime` takes responsibility for
+an ongoing outage (same as the alert link / admin's Acknowledge button — only
+works while it is still open and un-acknowledged).
+
+**Triage tasks** — the full task lifecycle (create, claim/unclaim/assign,
+reset/wake/revive/duplicate, client replies, PR actions, pushing to
+terminal-ide) is its own tool set: `create_task`, `claim_task`,
+`unclaim_task`, `assign_task`, `reset_task`, `wake_task`, `revive_task`,
+`dismiss_task_revival`, `duplicate_task`, `send_client_reply`,
+`save_client_reply`, `dismiss_client_reply`, `merge_pull_request`,
+`set_pull_request_state`, `update_pull_request`, `refresh_pull_request`,
+`push_task_to_terminal_ide`, `fail_job_log`, `resolve_asana_filter_labels`.
+See the `lqdeck-handoff` skill for the workflow these fit into rather than
+calling them ad hoc.
+
+**Organizations, users, roles — super admin only.** Everything here requires
+the `super_admin` role, not an in-organization permission:
+
+| Tool | |
+|---|---|
+| `list_organizations` / `save_organization` / `delete_organization` | tenants |
+| `attach_organization_project` / `detach_organization_project` | which projects belong to an organization |
+| `attach_organization_user` / `detach_organization_user` | who belongs to an organization |
+| `list_organization_requests` / `approve_organization_request` / `reject_organization_request` | self-serve join requests |
+| `list_users` / `save_user` / `delete_user` | accounts (password is write-only, e-mail is immutable) |
+| `list_roles` / `save_role` / `list_permissions` | roles are seeded, not created — rename/re-permission only |
+| `set_global_pause` | instance-wide orchestrator emergency stop (not per-project — that's `update_project`'s `orchestrator_enabled`) |
+| `cleanup_stuck_tasks` | sweep tasks stuck past their timeout; `preview: true` (default) to see what would happen first |
 
 ## Permissions
 
@@ -168,11 +226,6 @@ to confirm the model is offered for the project's current agent harness →
 `update_project(project_id: …, orchestrator_settings: {claude_model: "claude-opus-5"})`
 → report the `changed` list.
 
-**"Turn off automerge for XYZ."**
-`update_project(project_id: …, orchestrator_settings: {auto_merge_when_safe: false})`.
-Do not also send `auto_merge_max_risk` — it stays as it was, ready for when
-automerge is turned back on.
-
 **"Only take Freelo tasks created after 1 August 2026."**
 `get_project` for the source's `id` → `configure_source(project_id: …,
 config_id: …, trigger_min_created_at: "2026-08-01T00:00:00+02:00")`. Check
@@ -181,12 +234,17 @@ something for source types that report it. Do **not** send `config` — the stor
 Freelo token stays put.
 
 **"Set up a new project for shop.example.com."** (interactive)
-`describe_resource(resource: "project")` → walk `steps`: name; uptime URL; who gets
-outage alerts; Slack error reporting (skip the webhook if they say no); orchestrator
-(skip the whole step if they say no) → one `create_project(...)` call with everything
-→ hand them the `api_key` **once**, tell them where it goes (the connector config),
-and mention that git credentials, if they enabled the orchestrator, still need the
-admin panel. Follow with the `lqdeck-connect` skill to actually wire the app up.
+If this is a repository the user has open right now, prefer the `setup-project`
+MCP prompt (or `/lqdeck:setup`) over doing it by hand here — it chains exactly
+these steps together with repo discovery and a final verification. Doing it by
+hand: `describe_resource(resource: "project")` → walk `steps`: name; uptime URL;
+who gets outage alerts; Slack error reporting (skip the webhook if they say no);
+orchestrator (skip the whole step if they say no) → one `create_project(...)`
+call with everything → hand them the `api_key` **once**, tell them where it goes
+(the connector config). If they enabled the orchestrator, git credentials go
+through `update_project`'s `auth_method`/`git_username`/
+`orchestrator_git_credentials` too — no admin-panel step needed. Follow with the
+`lqdeck-connect` skill to actually wire the app up.
 
 **"Add our production database as context for the AI."**
 `list_source_types` → `describe_resource(resource: "triage_source", project_id: …,

@@ -8,7 +8,7 @@
     {
       "name": "lqdeck",
       "source": "./",
-      "description": "Connect Claude Code to LQDeck: browse monitored projects, application errors and cron runs, mark errors as resolved, pick up AI-triage tasks left by the cloud orchestrator, query a project's own database/logs, and wire up a new app to LQDeck's monitoring connector."
+      "description": "Connect Claude Code to LQDeck: set up a new project end to end with one prompt (`/lqdeck:setup`), browse monitored projects, application errors and cron runs, mark errors as resolved, pick up AI-triage tasks left by the cloud orchestrator, and query a project's own database/logs."
     }
   ]
 }

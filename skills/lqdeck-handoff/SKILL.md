@@ -22,8 +22,8 @@ locally instead of prompting the cloud agent further.
 
 1. Call `get_task_handoff` with the chosen `task_id`. It returns everything
    needed to continue: the repository URL, the task's branch name, any linked
-   pull request, a diff stat, the verification result (if any), and the full
-   human-facing conversation thread — plus specific checkout instructions.
+   pull request, a diff stat, and the full human-facing conversation thread —
+   plus specific checkout instructions.
 2. In a local clone of that repository:
    - `git fetch origin`
    - `git checkout <branch>` (create a local tracking branch if it doesn't

@@ -20,16 +20,32 @@ Claude how to use it well.
   - `lqdeck-context` — investigating errors/crons with a project's own
     database and logs, and marking errors resolved once handled.
   - `lqdeck-connect` — wiring a new or existing app up to LQDeck monitoring.
-- **Command** — `/lqdeck-pickup`: find your waiting triage tasks and prepare a
-  local checkout of one.
-- **Prompt** — `integrate-lqdeck` (served by the MCP server itself): a guided
-  end-to-end flow for connecting the current repository to LQDeck.
+- **Commands**:
+  - `/lqdeck:setup` — connect the current repository to LQDeck in one guided
+    pass: discovery, project, connector, monitoring, sources, secrets,
+    verification. The main way to onboard a new app.
+  - `/lqdeck-pickup` — find your waiting triage tasks and prepare a local
+    checkout of one.
+- **Prompt** — `setup-project` (served by the MCP server itself, and what
+  `/lqdeck:setup` calls): the same guided end-to-end connection flow, callable
+  directly by name with `project_name`/`framework`/`project_id` arguments.
 
 ## Install
+
+Inside a running Claude Code:
 
 ```
 /plugin marketplace add liquiddesign/lqdeck-mcp
 /plugin install lqdeck@lqdeck
+```
+
+Or from a shell — same thing, and this is the form to use when you want the
+plugin in *every* project rather than the current one (`claude plugin install`
+defaults to `--scope user`):
+
+```
+claude plugin marketplace add liquiddesign/lqdeck-mcp
+claude plugin install lqdeck@lqdeck
 ```
 
 The [liquiddesign/lqdeck-mcp](https://github.com/liquiddesign/lqdeck-mcp)
@@ -44,11 +60,22 @@ The first time Claude Code calls an `lqdeck` MCP tool, the server responds
 and opens your browser to log in to LQDeck. Approve it there and the session
 continues automatically — no token needs to be copied anywhere.
 
+### Claude Code on a remote machine (SSH, container, server-hosted IDE)
+
+OAuth ends on a loopback callback (`http://localhost:<port>/callback`) that only
+the machine running Claude Code can answer. If your browser is on a different
+machine, that address is unreachable there.
+
+LQDeck covers this case: after you approve, it shows a page with the full
+callback address instead of redirecting to it. Copy that address and paste it
+back into Claude Code when it asks for the URL from your browser — the page
+itself walks you through it. The address contains a one-time code, so it works
+once and expires quickly; if it fails, just start the sign-in again.
+
 ### Manual token fallback
 
-If a browser can't be opened from the environment Claude Code is running in
-(e.g. a headless remote box), you can authenticate with a personal access
-token instead:
+If a browser can't be opened at all (CI, an unattended script), you can
+authenticate with a personal access token instead:
 
 1. In the LQDeck admin panel, go to **`/app/api-tokens`** and create a token.
 2. Copy the plaintext token shown once.

@@ -1,7 +1,7 @@
 {
   "name": "lqdeck",
-  "description": "Connect Claude Code to LQDeck: browse monitored projects, application errors and cron runs, mark errors as resolved, provision projects and configure AI trigger/context sources interactively (same validation as the admin panel), pick up AI-triage tasks left by the cloud orchestrator, query a project's own database/logs, and wire up a new app to LQDeck's monitoring connector.",
-  "version": "0.4.0",
+  "description": "Connect Claude Code to LQDeck: set up a new project end to end with one prompt (`/lqdeck:setup`), browse monitored projects, application errors and cron runs, mark errors as resolved, administer projects/sources/crons interactively (same validation as the admin panel), and pick up AI-triage tasks left by the cloud orchestrator.",
+  "version": "0.5.0",
   "author": {
     "name": "LiquidDesign"
   },
